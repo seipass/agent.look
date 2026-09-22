@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -142,6 +143,38 @@ func sanitizePath(s string) string {
 		}
 	}
 	return s
+}
+
+func filterAgentLockStatus(status string) string {
+	var kept []string
+	for _, line := range strings.Split(strings.ReplaceAll(status, "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		path := line
+		if len(line) > 3 {
+			path = strings.TrimSpace(line[3:])
+		}
+		path = strings.Trim(path, "\"")
+		if filepath.Base(path) == defaultLock {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
+func isNoisyEnvironmentKey(key string) bool {
+	switch key {
+	case "_", "PWD", "OLDPWD", "SHLVL", "PS1", "PS2", "PROMPT", "COLORTERM", "LS_COLORS", "SESSION_MANAGER", "DISPLAY", "WAYLAND_DISPLAY", "TMPDIR":
+		return true
+	}
+	for _, prefix := range []string{"TERM_SESSION_", "SSH_", "XDG_", "VTE_", "WT_", "ITERM_", "DBUS_", "GNOME_", "KDE_", "GPG_TTY"} {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func shellDisplay(parts []string) string {

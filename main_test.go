@@ -45,3 +45,20 @@ func TestLockRoundTrip(t *testing.T) {
 		t.Fatalf("bad round trip: %#v", got)
 	}
 }
+
+func TestFilterAgentLockStatus(t *testing.T) {
+	status := "?? agent.lock\n M src/main.go\n?? sub/agent.lock\n"
+	got := filterAgentLockStatus(status)
+	if got != " M src/main.go" {
+		t.Fatalf("unexpected filtered status: %q", got)
+	}
+}
+
+func TestNoisyEnvironmentKey(t *testing.T) {
+	if !isNoisyEnvironmentKey("TERM_SESSION_ID") {
+		t.Fatal("expected terminal session variable to be ignored")
+	}
+	if isNoisyEnvironmentKey("DATABASE_URL") {
+		t.Fatal("application environment variable must not be ignored")
+	}
+}

@@ -106,7 +106,8 @@ func captureRepository() *RepositoryInfo {
 	branch, _ := commandOutput("git", "branch", "--show-current")
 	commit, _ := commandOutput("git", "rev-parse", "HEAD")
 	status, _ := commandOutput("git", "status", "--porcelain=v1", "--untracked-files=normal")
-	diffText, _ := commandOutput("git", "diff", "HEAD")
+	status = filterAgentLockStatus(status)
+	diffText, _ := commandOutput("git", "diff", "HEAD", "--", ".", ":(exclude)agent.lock")
 	info := &RepositoryInfo{Root: sanitizePath(root), Branch: branch, Commit: commit, Dirty: strings.TrimSpace(status) != ""}
 	if info.Dirty {
 		info.DiffHash = hashBytes([]byte(diffText + "\n" + status))

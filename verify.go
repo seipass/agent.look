@@ -63,6 +63,9 @@ func verify(lock Lock) []Drift {
 	oldEnv := stringSet(lock.Environment.EnvPresent)
 	nowEnv := stringSet(currentEnv.EnvPresent)
 	for key := range oldEnv {
+		if isNoisyEnvironmentKey(key) {
+			continue
+		}
 		if !nowEnv[key] {
 			add("high", "env."+key+".present", "true", "false", "An environment variable that existed during recording is missing.")
 		}
