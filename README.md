@@ -1,13 +1,41 @@
 # agent.look
 
-**A lock file for AI coding runs.**
+**A lockfile for AI coding.**
 
-Package managers have lock files so tomorrow uses the same dependencies as today. `agent.look` does the same kind of job for AI-assisted development: it records the conditions around a coding run in one `agent.lock` file.
+`agent.look` records the conditions of an AI coding run in one `agent.lock` file, so you can see what changed when yesterday's run cannot be reproduced today.
 
 ```text
-$ agent.look inspect
+AI coding run
+     │
+     ├── model
+     ├── prompt
+     ├── instructions
+     ├── tools
+     ├── permissions
+     ├── Git state
+     ├── environment
+     └── checks
+          │
+          ▼
+      agent.lock
+```
+
+## Try it in 30 seconds
+
+Record a run:
+
+```sh
+agent.look record --agent codex --model gpt-5.6 -- codex exec "Fix the flaky test"
+```
+
+See what was recorded:
+
+```sh
+agent.look inspect
+```
+
+```text
 agent.look schema 1
-created: 2026-09-22T05:00:00Z
 agent: codex
 model: gpt-5.6
 command: codex exec "Fix the flaky test"
@@ -19,10 +47,13 @@ permissions: network, write
 tests: 1
 ```
 
-Later:
+Later, check whether the conditions changed:
+
+```sh
+agent.look verify
+```
 
 ```text
-$ agent.look verify
 ! HIGH   repository.commit
   recorded: 91c8f2d4a61e...
   current:  3a612de71a4c...
@@ -34,73 +65,70 @@ $ agent.look verify
   why:      Tool version changed.
 ```
 
-## Record a run
+That's the whole idea: **one AI coding run, one inspectable lockfile.**
+
+## Install
+
+```sh
+go install github.com/seipass/agent.look@latest
+```
+
+Or build it locally:
+
+```sh
+git clone https://github.com/seipass/agent.look
+cd agent.look
+go build .
+```
+
+## What goes into `agent.lock`
+
+| Area | Recorded |
+| --- | --- |
+| Agent | name, model, launch command, exit code, duration |
+| Prompt | supplied text or prompt-file contents |
+| Instructions | hashes and contents of common repository instruction files |
+| External tools | project-level server names and executable commands from supported configuration files |
+| Permissions | permissions declared for the run |
+| Repository | commit, branch, working-tree state, local-change digest |
+| Environment | operating system, CPU, kernel, timezone, tool versions, executable paths |
+| Checks | commands, exit codes, duration, output digests |
+
+Environment variable **values are never stored**.
+
+## Record checks too
 
 ```sh
 agent.look record \
   --agent codex \
   --model gpt-5.6 \
-  --prompt-file task.md \
-  --permission write \
-  --permission network \
   --test "go test ./..." \
-  -- codex exec "$(cat task.md)"
+  -- codex exec "Fix the flaky test"
 ```
 
-This writes `agent.lock` after the command and recorded checks finish.
+The check result becomes part of `agent.lock`.
 
-You can also record metadata without executing an agent command:
+Run the recorded checks again later:
 
 ```sh
-agent.look record --agent my-agent --model my-model --prompt "Fix issue #42"
+agent.look test
 ```
-
-## What goes into `agent.lock`
-
-- agent name and model
-- the exact command used to launch it
-- prompt text or prompt-file contents when supplied
-- hashes of common instruction files such as `AGENTS.md`, `CLAUDE.md`, and repository Copilot instructions
-- project-level MCP server names and commands from common configuration files
-- declared permissions
-- Git commit, branch, working-tree state, and a digest of local changes
-- operating system, CPU architecture, kernel, timezone, developer-tool versions, and executable paths
-- names of environment variables that were present
-- verification commands, exit codes, duration, and output digests
-
-Environment variable **values are never stored**.
-
-`agent.lock` can contain prompt text and command arguments. Review it before publishing if those contain sensitive information.
-
-## Verify drift
-
-```sh
-agent.look verify
-```
-
-Machine-readable output:
-
-```sh
-agent.look verify --json
-```
-
-The verifier checks the current repository, instruction files, environment, and tool versions against the recorded run.
 
 ## Replay
 
-See what would be replayed:
+Preview the recorded command:
 
 ```sh
 agent.look replay
 ```
 
-The recorded agent command is **not executed by default**. To execute it:
+Execute it only when you explicitly ask:
 
 ```sh
 agent.look replay --run
 ```
 
-Replay stops when it detects environment drift. If you have reviewed the differences and still want to continue:
+Replay stops when `agent.look` detects environment drift. After reviewing the differences, you can override that check:
 
 ```sh
 agent.look replay --run --force
@@ -112,13 +140,17 @@ Run the recorded checks afterward:
 agent.look replay --run --tests
 ```
 
-Or run only the recorded checks:
+## Safety
 
-```sh
-agent.look test
-```
+An `agent.lock` file can contain prompt text and command arguments. Review it before publishing if those contain sensitive information.
 
-Treat lock files from strangers like shell scripts. `replay --run` can execute the command stored in the file.
+`replay --run` can execute the command stored in the file. Treat lockfiles from strangers with the same caution as shell scripts.
+
+## What `agent.look` can reproduce
+
+`agent.look` records the parts of a coding run it can observe locally and detects when they drift.
+
+It does **not** freeze a hosted AI model, remote service, network response, or hidden provider-side state. A matching `agent.lock` means the recorded local conditions still match; it is not a promise that an external model will return identical output.
 
 ## Detected instruction files
 
@@ -141,27 +173,17 @@ The first release reads project-level server names and executable commands from:
 - `.cursor/mcp.json`
 - `.vscode/mcp.json`
 
-It does not copy server environment values or secrets into the lock file.
+Server environment values and secrets are not copied into the lockfile.
 
-## Install
-
-With Go:
+## Machine-readable verification
 
 ```sh
-go install github.com/seipass/agent.look@latest
-```
-
-Or build from source:
-
-```sh
-git clone https://github.com/seipass/agent.look
-cd agent.look
-go build .
+agent.look verify --json
 ```
 
 ## Status
 
-Early release. The lock schema is versioned and intentionally small enough to inspect by hand. Expect changes before v1.0.
+Early release. The lock schema is versioned and may change before v1.0.
 
 ## License
 
